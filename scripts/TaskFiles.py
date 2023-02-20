@@ -69,7 +69,7 @@ class StrainFileManager:
         return data_dict
 
 
-SFM = StrainFileManager(alternative_data_folder, db.StrainDB)
+#SFM = StrainFileManager(alternative_data_folder, db.StrainDB)
 
 class Tasks:
     def __init__(self, tasks, folder):
