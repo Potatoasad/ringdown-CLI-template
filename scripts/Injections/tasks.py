@@ -23,9 +23,20 @@ class LazyTask:
 class InjectionTasks:
     foldername : str
     tasks : list
+    lazy : Union[bool, None] = None
+
+    def is_lazy(self, lazy):
+        if lazy is None:
+            if self.lazy is None:
+                return False
+            else:
+                return self.lazy
+        else:
+            return lazy
     
     @classmethod
-    def from_folder(cls, foldername, lazy=False):
+    def from_folder(cls, foldername, lazy=None):
+        lazy = self.is_lazy(lazy)
         _, folders, _ = next(os.walk(foldername))
         tasks = []
         for folder in folders:
@@ -38,7 +49,16 @@ class InjectionTasks:
         
         return cls(foldername=foldername, tasks=tasks)
 
-    def add_task(self, thetask, lazy=False):
+    def task_folder(self, task):
+        return os.path.join(self.foldername, task.name)
+
+    def task_to_folder(self, task):
+        task_folder = self.task_folder(task)
+        print(f"saving in {task_folder}")
+        task.inference_object.to_folder(task_folder)
+
+    def add_task(self, thetask, lazy=None):
+        lazy = self.is_lazy(lazy)
         if lazy:
             if not os.path.exists(self.foldername):
                 os.mkdir(self.foldername)
@@ -58,11 +78,12 @@ class InjectionTasks:
             os.mkdir(self.foldername)
             
         for i,task in enumerate(self.tasks):
-            name = task.name
-            task_folder = os.path.join(self.foldername, name)
-            print(f"saving in {task_folder}")
-            self.tasks[i].inference_object.to_folder(task_folder)
+            self.task_to_folder(task)
             
-    def run(self):
+    def run(self, lazy=None):
+        lazy = self.is_lazy(lazy)
         for i in trange(len(self.tasks)):
-            self.tasks[i].inference_object.fit.run()
+            IO = self.tasks[i].inference_object
+            IO.fit.run()
+            if lazy:
+                self.task_to_folder(Task(name=self.tasks[i].name,  inference_object=IO))
