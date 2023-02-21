@@ -38,7 +38,7 @@ class InjectionTasks:
     def from_folder(cls, foldername, lazy=None):
         if lazy is None:
             lazy = False
-            
+
         _, folders, _ = next(os.walk(foldername))
         tasks = []
         for folder in folders:
@@ -82,10 +82,10 @@ class InjectionTasks:
         for i,task in enumerate(self.tasks):
             self.task_to_folder(task)
             
-    def run(self, lazy=None):
+    def run(self, lazy=None, **kwargs):
         lazy = self.is_lazy(lazy)
         for i in trange(len(self.tasks)):
             IO = self.tasks[i].inference_object
-            IO.fit.run()
+            IO.fit.run(**kwargs)
             if lazy:
                 self.task_to_folder(Task(name=self.tasks[i].name,  inference_object=IO))
