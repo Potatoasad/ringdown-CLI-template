@@ -36,7 +36,9 @@ class InjectionTasks:
     
     @classmethod
     def from_folder(cls, foldername, lazy=None):
-        lazy = self.is_lazy(lazy)
+        if lazy is None:
+            lazy = False
+            
         _, folders, _ = next(os.walk(foldername))
         tasks = []
         for folder in folders:
