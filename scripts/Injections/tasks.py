@@ -37,7 +37,19 @@ class InjectionTasks:
                                   inference_object=InferenceObject.from_folder(os.path.join(foldername,folder))))
         
         return cls(foldername=foldername, tasks=tasks)
-    
+
+    def add_task(self, thetask, lazy=False):
+        if lazy:
+            if not os.path.exists(self.foldername):
+                os.mkdir(self.foldername)
+
+            task_folder = os.path.join(self.foldername, thetask.name)
+            print(f"saving in {task_folder}")
+            thetask.inference_object.to_folder(task_folder)
+            self.tasks.append(LazyTask(thetask.name, task_folder))
+        else:
+            self.tasks.append(thetask)
+
     def to_folder(self, overwrite=False):
         if overwrite:
             if os.path.exists(self.foldername):

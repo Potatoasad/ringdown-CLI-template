@@ -8,8 +8,10 @@ import scipy
 from .injection import *
 from .preconditioning import *
 from .priorsettings import *
+from .configfile import *
 import matplotlib.pyplot as plt
 import arviz as az
+import seaborn as sns
 
 @dataclass
 class InferenceObject:
@@ -72,6 +74,7 @@ class InferenceObject:
         return self.injection.SNR(t_initial=t_geo, duration=duration)
     
     def to_config(self, filepath):
+        IO = self
         cf = ConfigFile(filepath)
         cf.read()
         cf.set_val("Injection", "model", IO.injection.qnm_model.model, as_str=True)

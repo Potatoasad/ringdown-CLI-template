@@ -2,6 +2,14 @@
 ### Config File
 import configparser
 from numbers import Number
+from .mode import *
+from .polarizations import *
+from .qnm_model import *
+from .timing import *
+from .preconditioning import *
+from .priorsettings import *
+from .detector_noise import *
+from .db_config import db
 
 class ConfigFile:
     def __init__(self, filename):
@@ -33,13 +41,13 @@ class ConfigFile:
         if isinstance(the_thing, list): # If its a list
             return_list = []
             for i in range(len(the_thing)):
-                the_str = stringify(the_thing[i])
+                the_str = self.stringify(the_thing[i])
                 return_list.append(the_str)
             return "[" + ", ".join(return_list)   + "]"
         elif isinstance(the_thing, dict): # if its a dict
             return_dict = {}
             for k in the_thing.keys():
-                the_str = stringify(the_thing[k])
+                the_str = self.stringify(the_thing[k])
                 return_dict[k] = the_str
             return "dict(" + ", ".join([f"{k} = {v}" for k,v in return_dict.items()]) + ")" 
         elif isinstance(the_thing, str): # if its a string
@@ -52,6 +60,7 @@ class ConfigFile:
     def __getitem__(self, *args):
         inputs = args[0]
         if isinstance(inputs, tuple):
+            from .db_config import db
             return eval(self.config[inputs[0]][inputs[1]])
         else:
             return self.config.__getitem__(*args)

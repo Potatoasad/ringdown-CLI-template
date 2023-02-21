@@ -3,7 +3,7 @@ import scipy
 import numpy as np
 import ringdown
 from dataclasses import dataclass
-
+from .timing import *
 
 def generate_strain_from_psd(psd, t_start):
     acf = psd.to_acf()

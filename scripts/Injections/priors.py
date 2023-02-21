@@ -3,6 +3,7 @@ import aesara.tensor as at
 from dataclasses import dataclass
 import numpy as np
 import arviz as az
+from .polarizations import *
 
 @dataclass
 class AmplitudePrior:
