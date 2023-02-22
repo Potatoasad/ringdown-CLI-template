@@ -29,7 +29,8 @@ class KerrQnms(QnmModel):
         if (mode.p != -1): raise ValueError("Only prograde modes are allowed p = -1")
         return True
         
-    def generate_ftau(self, M, chi, modes=[Mode(n=0),Mode(n=1)]): # returns [f0,f1],[tau0,tau1]
+    def generate_ftau(self, M, chi): # returns [f0,f1],[tau0,tau1]
+        modes = self.modes
         if not np.all([self.mode_test(mode) for mode in modes]):
             raise ValueError("These modes are not supported yet")
         fs = []; taus=[];
