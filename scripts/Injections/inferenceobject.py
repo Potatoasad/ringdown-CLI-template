@@ -4,6 +4,7 @@ import os
 from typing import Union
 import numpy as np
 import ringdown
+import aesara.tensor as at
 import scipy
 from .injection import *
 from .preconditioning import *
@@ -187,6 +188,38 @@ class InferenceObject:
                 param_plot[0].axvline(IO.injection.params[param_new], c=theplot[0][0].lines[0].get_c())
 
         plt.show()
+        
+    def compute_h_det(self):
+        the_posterior = self.fit.result.posterior
+        t0s = self.fit.model_input['t0']
+        ts = self.fit.model_input['times']
+        Fps = self.fit.model_input['Fps']
+        Fcs = self.fit.model_input['Fcs']
+
+        ndet = len(self.detectors)
+        nmode = len(self.modes)
+        nsamp = ts[0].shape[0]
+        ndraws = len(the_posterior.draw)
+        nchains = len(the_posterior.chain)
+
+        t0s = at.as_tensor_variable(t0s).reshape((1, 1, ndet, 1, 1))
+        ts = at.as_tensor_variable(ts).reshape((1, 1, ndet, 1, nsamp))
+        Fps = at.as_tensor_variable(Fps).reshape((1, 1, ndet, 1, 1))
+        Fcs = at.as_tensor_variable(Fcs).reshape((1, 1, ndet, 1, 1))
+        fs = at.as_tensor_variable(the_posterior.f.values).reshape((nchains, ndraws, 1, nmode, 1))
+        gammas = at.as_tensor_variable(the_posterior.gamma.values).reshape((nchains, ndraws, 1, nmode, 1))
+        Apxs = at.as_tensor_variable(the_posterior.Apx.values).reshape((nchains, ndraws, 1, nmode, 1))
+        Apys = at.as_tensor_variable(the_posterior.Apy.values).reshape((nchains, ndraws, 1, nmode, 1))
+        Acxs = at.as_tensor_variable(the_posterior.Acx.values).reshape((nchains, ndraws, 1, nmode, 1))
+        Acys = at.as_tensor_variable(the_posterior.Acy.values).reshape((nchains, ndraws, 1, nmode, 1))
+
+        h_det_mode = ringdown.model.rd(ts - t0s, fs, gammas, Apxs, Apys, Acxs, Acys, Fps, Fcs)
+        h_det = at.sum(h_det_mode, axis=3)
+
+        h_det_ev = h_det.eval()
+        h_det_mode_ev = h_det_mode.eval()
+        self.fit.result.posterior['h_det'] = (('chain', 'draw', 'ifo', 'time_index'), h_det_ev)
+        self.fit.result.posterior['h_det_mode'] = (('chain', 'draw', 'ifo', 'mode', 'time_index'), h_det_mode_ev)
         
     def plot_whitened_posteriors(self):
         IO = self

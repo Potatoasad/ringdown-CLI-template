@@ -43,6 +43,7 @@ class AmplitudePrior:
 @dataclass
 class FlatAPrior(AmplitudePrior):
     A_scale : float = 2.5e-21
+    flat_A : int = True
     
     @property
     def model(self):
@@ -69,7 +70,43 @@ class FlatAPrior(AmplitudePrior):
             
             A = pm.Deterministic("A", a_from_quadratures(Apx, Apy, Acx, Acy), dims=['mode'])
             
-            pm.Potential("flat_A_prior", -3*at.sum(at.log(A)))
+            if self.flat_A:
+                pm.Potential("flat_A_prior", -3*at.sum(at.log(A)))
+            
+        return model_A
+    
+@dataclass
+class GaussianAPrior(AmplitudePrior):
+    A_scale : float = 2.5e-21
+    flat_A : int = False
+    
+    @property
+    def model(self):
+        coords = {'mode': np.arange(len(self.modes))}
+        unif_lower = [-1]*len(self.modes)
+        unif_upper = [1]*len(self.modes)
+        A_scale = self.A_scale
+        
+        def a_from_quadratures(Apx, Apy, Acx, Acy):
+            A = 0.5*(at.sqrt(at.square(Acy + Apx) + at.square(Acx - Apy)) +
+                     at.sqrt(at.square(Acy - Apx) + at.square(Acx + Apy)))
+            return A
+        
+        with pm.Model(coords=coords) as model_A:
+            Apx_unit = pm.Normal("Apx_unit", dims=['mode'])
+            Apy_unit = pm.Normal("Apy_unit", dims=['mode'])
+            Acx_unit = pm.Normal("Acx_unit", dims=['mode'])
+            Acy_unit = pm.Normal("Acy_unit", dims=['mode'])
+
+            Apx = pm.Deterministic("Apx", A_scale*Apx_unit, dims=['mode'])
+            Apy = pm.Deterministic("Apy", A_scale*Apy_unit, dims=['mode'])
+            Acx = pm.Deterministic("Acx", A_scale*Acx_unit, dims=['mode'])
+            Acy = pm.Deterministic("Acy", A_scale*Acy_unit, dims=['mode'])
+            
+            A = pm.Deterministic("A", a_from_quadratures(Apx, Apy, Acx, Acy), dims=['mode'])
+            
+            if self.flat_A:
+                pm.Potential("flat_A_prior", -3*at.sum(at.log(A)))
             
         return model_A
 

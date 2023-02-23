@@ -31,11 +31,12 @@ class KerrQnms(QnmModel):
         
     def generate_ftau(self, M, chi): # returns [f0,f1],[tau0,tau1]
         modes = self.modes
+        kerr_modes = [ringdown.qnms.KerrMode((mode.p,mode.s,mode.l,mode.m,mode.n)) for mode in modes]
         if not np.all([self.mode_test(mode) for mode in modes]):
             raise ValueError("These modes are not supported yet")
         fs = []; taus=[];
-        for mode in modes:
-            fs_i, tau_i = ringdown.qnms.get_ftau(M=M,chi=chi,n=mode.n, l=mode.l)
+        for mode in kerr_modes:
+            fs_i, tau_i = mode.ftau(m_msun=M,chi=chi)
             fs.append(fs_i); taus.append(tau_i)
         return fs, taus
     
