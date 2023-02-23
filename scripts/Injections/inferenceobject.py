@@ -3,16 +3,20 @@
 import os
 from typing import Union
 import numpy as np
+from numpy.linalg import inv
 import ringdown
+import pymc as pm
 import aesara.tensor as at
 import scipy
 from .injection import *
 from .preconditioning import *
 from .priorsettings import *
 from .configfile import *
+import pandas as pd
 import matplotlib.pyplot as plt
 import arviz as az
 import seaborn as sns
+from .priormodels import *
 
 @dataclass
 class InferenceObject:
@@ -25,6 +29,7 @@ class InferenceObject:
     model: Union[str, None] = None
     fit: Union[ringdown.Fit, None] = None
     detectors: Union[list, None] = None
+    _prior_fit: Union[ringdown.Fit, None] = None
     
     def __post_init__(self):
         ## detectors: inherit from injection if none
@@ -221,6 +226,92 @@ class InferenceObject:
         self.fit.result.posterior['h_det'] = (('chain', 'draw', 'ifo', 'time_index'), h_det_ev)
         self.fit.result.posterior['h_det_mode'] = (('chain', 'draw', 'ifo', 'mode', 'time_index'), h_det_mode_ev)
         
+    def compute_prior(self):
+        prior_mappings = {'mchi' : make_mchi_model_prior, 
+                          'mchiq': make_mchiq_model_prior,
+                          'mchiq_exact':make_mchiq_exact_model_prior}
+        
+        if self.fit.model in prior_mappings.keys():
+            prior_func = prior_mappings[self.fit.model]
+        else:
+            raise NotImplementedError(f"The model '{self.fit.model}' is not implemented for priors")
+            
+        prior_model = prior_func(**self.fit.model_input)
+        with prior_model:
+            prior_result = pm.sample(cores=1)
+            prior_trace = az.convert_to_inference_data(prior_result)
+        
+        self._prior_fit = self.fit.copy()
+        self._prior_fit.result = prior_trace
+        
+    @property
+    def prior_fit(self):
+        if self._prior_fit is None:
+            self.compute_prior()
+            
+        return self._prior_fit
+    
+    def plot_whitened_data(self, figsize=(10,8), dpi=200):
+        saved_vars = list(self.fit.result.posterior.variables.keys())
+        if ('h_det' not in saved_vars):
+            self.compute_h_det()
+        
+        prior_fit = self.prior_fit
+        times = self.fit.model_input['times']
+        signals_post = {}
+        ds = self.preconditioning.ds
+        for i,ifo in enumerate(self.detectors):
+            signals_post[ifo] = self.injection.signal[ifo].condition(t0 = getattr(self.target, f"t_{ifo}"), ds=ds)[times[i]]
+
+        upper_prior = {}
+        lower_prior = {}
+        whitened = prior_fit.whitened_templates
+        for i,ifo in enumerate(self.detectors):
+            lower_prior[ifo] = np.array([np.percentile(whitened[i,j,:],5) for j in range(whitened.shape[1])])
+            upper_prior[ifo] = np.array([np.percentile(whitened[i,j,:],95) for j in range(whitened.shape[1])])
+
+        upper_posterior = {}
+        lower_posterior = {}
+        whitened = self.fit.whitened_templates
+        for i,ifo in enumerate(self.detectors):
+            lower_posterior[ifo] = np.array([np.percentile(whitened[i,j,:],5) for j in range(whitened.shape[1])])
+            upper_posterior[ifo] = np.array([np.percentile(whitened[i,j,:],95) for j in range(whitened.shape[1])])
+        
+        fig, axes = plt.subplots(nrows=2, figsize=figsize, dpi=dpi)
+        for i,ifo in enumerate(self.detectors):
+            axes[i].plot((inv(self.fit.model_input['Ls'][i]) @ signals_post[ifo].values), label='whitened injection', color='k')
+            axes[i].plot((inv(self.fit.model_input['Ls'][i]) @ self.fit.analysis_data[ifo].values), label='whitened strain', alpha=0.7)
+            #axes[i].plot((inv(IO.fit.model_input['Ls'][i]) @ MAP_post[ifo].values), label='MAP estimate')
+            axes[i].fill_between(np.arange(len(signals_post[ifo].values)), lower_prior[ifo], upper_prior[ifo], label="90% signal prior range", alpha=0.3)
+            axes[i].fill_between(np.arange(len(signals_post[ifo].values)), lower_posterior[ifo], upper_posterior[ifo], label="90% signal posterior range", alpha=0.3, color='r')
+            axes[i].set_title(ifo)
+            axes[i].grid(alpha=0.2)
+            axes[i].legend()
+        return fig, axes
+        
+    def pair_plot(self, x='M', y='chi'):
+        x_d = getattr(self.prior_fit.result.posterior,x).values.flatten()
+        y_d = getattr(self.prior_fit.result.posterior,y).values.flatten()
+        df = pd.DataFrame({x:x_d, y:y_d, 'dist': 'prior'})
+
+        inj_dict = self.injection.signal_params.copy()
+        inj_dict.update(self.injection.params)
+        def rep_list(x):
+            if isinstance(x, list):
+                return x[0]
+            return x
+        inj_dict = {k:rep_list(v) for k,v in inj_dict.items()}
+
+        x_d2 = getattr(self.fit.result.posterior,x).values.flatten()
+        y_d2 = getattr(self.fit.result.posterior,y).values.flatten()
+        df2 = pd.DataFrame({x:x_d2, y:y_d2, 'dist': 'posterior'})
+
+        df_total = pd.concat([df,df2])
+        the_plot = sns.jointplot(df_total,x=x,y=y, hue='dist', kind='kde', fill=True, alpha=1, common_norm=False)
+        if (x in inj_dict.keys()) and (y in inj_dict.keys()):
+            the_plot.ax_joint.scatter([inj_dict[x]],[inj_dict[y]],marker='+')
+        plt.show()
+
     def plot_whitened_posteriors(self):
         IO = self
         fig, ax = plt.subplots(nrows=3, ncols=2, sharex='col', figsize=(20, 10))
