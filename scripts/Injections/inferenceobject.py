@@ -173,7 +173,8 @@ class InferenceObject:
         IO = self
         if var_names is None:
             a_rep = lambda x : 'A' if x in ['a'] else x
-            var_names = list([a_rep(a) for a in IO.injection.signal_params]) + list(IO.injection.params.keys())
+            Q_rep = lambda x : 'Q_charge' if x in ['Q'] else x
+            var_names = list([Q_rep(a_rep(a)) for a in IO.injection.signal_params]) + list(IO.injection.params.keys())
         theplot = az.plot_trace(IO.fit.result, var_names=var_names)
         n_chains = len(IO.fit.result.posterior.chain)
         n_modes = len(IO.fit.result.posterior.mode)
@@ -229,7 +230,8 @@ class InferenceObject:
     def compute_prior(self):
         prior_mappings = {'mchi' : make_mchi_model_prior, 
                           'mchiq': make_mchiq_model_prior,
-                          'mchiq_exact':make_mchiq_exact_model_prior}
+                          'mchiq_exact':make_mchiq_exact_model_prior,
+                          'ftau' : make_ftau_model_prior}
         
         if self.fit.model in prior_mappings.keys():
             prior_func = prior_mappings[self.fit.model]

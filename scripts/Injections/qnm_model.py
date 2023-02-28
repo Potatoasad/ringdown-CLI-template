@@ -25,8 +25,8 @@ class KerrQnms(QnmModel):
                 raise ValueError(f"This QnmModel is not defined for {mode}")
         
     def mode_test(self, mode):
-        if (mode.s != -2): raise ValueError("Only s = -2 modes are ready for this")
-        if (mode.p != -1): raise ValueError("Only prograde modes are allowed p = -1")
+        #if (mode.s != -2): raise ValueError("Only s = -2 modes are ready for this")
+        #if (mode.p != 1): raise ValueError("Only prograde modes are allowed p = 1")
         return True
         
     def generate_ftau(self, M, chi): # returns [f0,f1],[tau0,tau1]
@@ -50,12 +50,33 @@ class ChargedQnms(QnmModel):
         
     def mode_test(self, mode):
         if (mode.s != -2): raise ValueError("Only s = -2 modes are ready for this")
-        if (mode.p != -1): raise ValueError("Only prograde modes are allowed p = -1")
+        #if (mode.p != 1): raise ValueError("Only prograde modes are allowed p = -1")
         if (mode.l !=  2): raise ValueError("Only l=2 are possible right now")
         if (mode.n not in [0,1,2]): raise ValueError("Only n <= 2 are possible right now")
         return True
         
     def generate_ftau(self, M, chi, Q): # returns [f0,f1],[tau0,tau1]
         return ringdown.coefficients.charged_coefficients.get_charged_ftau(M=M,chi=chi,Q=Q)
+    
+class FTauQnms(QnmModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.model = "ftau"
+        for mode in self.modes:
+            if not self.mode_test(mode):
+                raise ValueError(f"This QnmModel is not defined for {mode}")
+        
+    def mode_test(self, mode):
+        #if (mode.s != -2): raise ValueError("Only s = -2 modes are ready for this")
+        #if (mode.p != 1): raise ValueError("Only prograde modes are allowed p = 1")
+        return True
+        
+    def generate_ftau(self, **kwargs): # returns [f0,f1],[tau0,tau1]
+        modes = self.modes
+        fs = []; taus=[];
+        for mode in modes:
+            fs_i, gamma_i = self.coefficients[mode]
+            fs.append(fs_i); taus.append(1/gamma_i)
+        return fs, taus
 
 #######################################################

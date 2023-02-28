@@ -359,3 +359,71 @@ def make_mchiq_exact_model_prior(t0, times, strains, Ls, Fps, Fcs, f_coeffs, g_c
         #                    observed=strains[i], dims=['time_index'])
         
         return model
+    
+    
+def make_ftau_model(t0, times, strains, Ls, **kwargs):
+    f_min = kwargs.pop("f_min")
+    f_max = kwargs.pop("f_max")
+    gamma_min = kwargs.pop("gamma_min")
+    gamma_max = kwargs.pop("gamma_max")
+    A_scale = kwargs.pop("A_scale")
+    flat_A = kwargs.pop("flat_A", True)
+    nmode = kwargs.pop("nmode", 1)
+
+    ndet = len(t0)
+    nt = len(times[0])
+
+    ifos = kwargs.pop('ifos', np.arange(ndet))
+    modes = kwargs.pop('modes', np.arange(nmode))
+
+    coords = {
+        'ifo': ifos,
+        'mode': modes,
+        'time_index': np.arange(nt)
+    }
+
+    with pm.Model(coords=coords) as model:
+        pm.ConstantData('times', times, dims=['ifo', 'time_index'])
+        pm.ConstantData('t0', t0, dims=['ifo'])
+        pm.ConstantData('L', Ls, dims=['ifo', 'time_index', 'time_index'])
+
+        f = pm.Uniform("f", f_min, f_max, dims=['mode'])
+        gamma = pm.Uniform('gamma', gamma_min, gamma_max, dims=['mode'],
+                           transform=pm.distributions.transforms.ordered)
+
+        Ax_unit = pm.Normal("Ax_unit", dims=['mode'])
+        Ay_unit = pm.Normal("Ay_unit", dims=['mode'])
+
+        A = pm.Deterministic("A",
+            A_scale*at.sqrt(at.square(Ax_unit)+at.square(Ay_unit)),
+            dims=['mode'])
+        phi = pm.Deterministic("phi", at.arctan2(Ay_unit, Ax_unit),
+                               dims=['mode'])
+
+        tau = pm.Deterministic('tau', 1/gamma, dims=['mode'])
+        Q = pm.Deterministic('Q', np.pi*f*tau, dims=['mode'])
+
+        Apx = A*at.cos(phi)
+        Apy = A*at.sin(phi)
+
+        h_det_mode = pm.Deterministic("h_det_mode",
+            compute_h_det_mode(t0, times, np.ones(ndet), np.zeros(ndet),
+                               f, gamma, Apx, Apy, np.zeros(nmode),
+                               np.zeros(nmode)),
+            dims=['ifo', 'mode', 'time_index'])
+        h_det = pm.Deterministic("h_det", at.sum(h_det_mode, axis=1),
+                                 dims=['ifo', 'time_index'])
+
+        # Priors:
+
+        # Flat in M-chi already
+
+        # Amplitude prior
+        if flat_A:
+            # first bring us to flat in quadratures
+            pm.Potential("flat_A_quadratures_prior",
+                         0.5*at.sum(at.square(Ax_unit) + at.square(Ay_unit)))
+            pm.Potential("flat_A_prior", -at.sum(at.log(A)))
+
+        # Flat prior on the delta-fs and delta-taus
+        return model

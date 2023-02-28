@@ -142,8 +142,6 @@ class Injection:
 
         return self.strain
 
-
-
 #########################################
 # KERR BLACK HOLES
 ########################################
@@ -207,7 +205,38 @@ class ChargedInjection(Injection):
         param_input.update({k.lower() : pol_params(k) for k in ['A','theta','ellip', 'phi']})
         return param_input
     
-    
+
+#########################################
+# CUSTOM FREQUENCY RINGDOWN
+########################################
+### Specific model that can generate
+class FTauInjection(Injection):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.strain = {}
+        self.noise_realization = {}
+        self.signal = {}
+        #self.params["model"] = 'mchiq_exact'
+        if self.qnm_model is None:
+            self.qnm_model = FTauQnms(modes=self.modes, coefficients={mode : [self.params['f'][i], self.params['gamma'][i]] for i,mode in enumerate(self.modes)})
+            
+        if (self.noise is not None) and (self.timing is None):
+            self.timing = self.noise.timing
+            
+        if (self.noise is not None) and not self.noise.timing.timings_are_compatible(self.timing):
+            raise ValueError("The time arrays for the noise generator and the input timing are not compatible")
+            
+        self.generate()
+            
+    @property
+    def signal_params(self):
+        #param_input = {k:v for k,v in self.params.items() if k not in ['M','chi']};
+        #f,tau = self.qnm_model.generate_ftau(**{k:v for k,v in self.params.items() if k in ['M','chi']})
+        #param_input.update({'f': f, 'tau': tau})
+        param_input = self.params
+        pol_params = lambda k : [getattr(p, k) for p in self.polarizations]
+        param_input.update({k.lower() : pol_params(k) for k in ['A','theta','ellip', 'phi']})
+        return param_input   
         
 #CI = ChargedInjection(
 #    params    = {'M': 100, 'chi': 0.4, 'Q': 0.3},

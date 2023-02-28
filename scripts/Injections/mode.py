@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen = True, eq = True)
 class Mode:
-    p : int = -1
+    p : int = 1
     s : int = -2
     l : int = 2
     m : int = 2

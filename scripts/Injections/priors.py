@@ -181,7 +181,20 @@ class ChargedBlackHolePrior(BlackHoleParametersPrior):
         Q = np.sqrt(r2_qchi)*np.sin(theta_qchi)
         chi = np.sqrt(r2_qchi)*np.cos(theta_qchi)
         return dict(M = M, chi = chi, Q=Q)
- 
+    
+    
+@dataclass
+class FTauBlackHolePrior(BlackHoleParametersPrior):
+    f_min : float = 40
+    f_max : float = 200
+    gamma_min : float = 50
+    gamma_max : float = 400
+    
+    @property
+    def model(self):
+        f = self.f_min + (self.f_max - self.f_min) * np.random.rand(self.N_samples)
+        gamma = self.gamma_min + (self.gamma_max - self.gamma_min) * np.random.rand(self.N_samples)
+        return dict(f = f, gamma = gamma)
         
 
 #AP = FlatAPrior(modes=[Mode(n=0),Mode(n=1)], A_scale=5e-21)
